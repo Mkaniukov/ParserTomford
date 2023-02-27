@@ -8,23 +8,12 @@ from aiohttp import ClientSession, TCPConnector
 from bs4 import BeautifulSoup
 
 
-async def get_more_detail(soup, link):
-    try:
-        title = re.sub(" +", " ", soup.select_one("#collapseTwo > div").text.replace('\n\n', ''))
-    except BaseException as e:
-        title = "--"
-    await asyncio.sleep(0.5)
-    return title
-
-
 class ParserTomford:
 
     def __init__(self, url: str, bar, create_csv=True):
-        self.task = None
         self.rate_sem = asyncio.BoundedSemaphore(30)
         self.product_list_links = []
         self.url = url
-        self.more_detail_raw = []
         self.bar = bar
         self.fieldnames = ['title', 'details', 'color', 'images']
 
@@ -76,21 +65,28 @@ class ParserTomford:
             async with session.get(self.url) as main_response:
                 main_soup = BeautifulSoup(await main_response.text(), "lxml")
                 self.product_list_links = main_soup.find_all('a', class_="overlay-link")
-        return self.product_list_links
+        self.product_list_links
+
+    async def get_more_detail(self, soup, link):
+        try:
+            title = re.sub(" +", " ", soup.select_one("#collapseTwo > div").text.replace('\n\n', ''))
+        except BaseException as e:
+            title = "--"
+        await asyncio.sleep(0.5)
+        return title
 
     async def collect(self, link):
         async with ClientSession() as session:
             async with session.get(link.attrs['href']) as response:
                 soup = BeautifulSoup(await response.text(), 'lxml')
         title = re.sub(" +", " ", soup.find('h1', class_="product-name").text)
-        details = await get_more_detail(soup, link)
-
-        # re.sub(" +", " ", soup.select_one("#collapseTwo > div").text.replace('\n\n', ''))
+        details = await self.get_more_detail(soup, link)
         color = re.sub(" +", " ", soup.find('span', class_="selected-value").text)
-        all_image = soup.find_all('img', class_="primary-image")
-        images = {'photos': []}
-        images['photos'].extend(
-            [image.get('src').split("?")[0] if not "data:image" in image.get('src') else
-             image.get('data-src').split("?")[0] for image in
-             all_image])
+        # all_image = soup.find_all('img', class_="primary-image")
+        # images = {'photos': []}
+        images = [link.attrs['src'] for link in soup.find_all('img', class_="primary-image")]
+        # images['photos'].extend(
+            # [image.get('src').split("?")[0] if not "data:image" in image.get('src') else
+             # image.get('data-src').split("?")[0] for image in
+             # all_image])
         await self.create_csv(title, details, color, images)

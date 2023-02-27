@@ -32,7 +32,5 @@ class TotalParse:
 
 
 if __name__ == "__main__":
-    loop = asyncio.new_event_loop()
     total_parser = TotalParse()
-    loop.run_until_complete(total_parser.total_start("tomford"))
-    loop.close()
+    asyncio.run(total_parser.total_start("tomford"))
